@@ -1,11 +1,12 @@
 {
 	"name": "bin2d",
 	"description": "A tool that enables files to be compiled into an executable and extracted at startup.",
-	"homepage": "http://example.org",
+	"homepage": "https://github.com/rikkimax/Bin2D",
 	"copyright": "Copyright © 2013, Richard Andrew Cattermole",
 	"authors": [
 		"Richard Andrew Cattermole"
 	],
+	"license": "MIT",
 	"name": "bin2d",
 	"targetType": "executable",
 	"sourceFiles": ["source/Bin2D.d"],
