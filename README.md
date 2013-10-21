@@ -7,7 +7,8 @@ A tool that enables files to be compiled into an executable and extracted at sta
 Basic usage is as follows
 Bin2D <output file>[=<module name>] <files or directories...>
 
-** Example **
+**Example**
+
 $ ./Bin2D output.d=awsome.app.resources.output resources/images/logo.png resources/images/pretty.jpg resources/models/animated_logo.obj
 Will create a file called output.d with a model name of awsome.app.resources.output and will have:
 
@@ -30,7 +31,7 @@ import modulename;
 outputBin2D2FS("output/stored/here");
 ```
 
-** And for a temporary directories? **
+**And for a temporary directories?**
 ```D
 import modulename;
 outputBin2D2FS();
