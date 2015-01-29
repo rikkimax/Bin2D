@@ -35,7 +35,7 @@ int main(string[] args) {
 					foreach (entry; dirEntries(file, SpanMode.breadth)) {
 						if (isFile(entry)) {
 							files ~= entry;
-							filesWithoutScanDir ~= entry[file.length + 1 .. $];
+							filesWithoutScanDir ~= entry[file.length + 1 .. $].tr("\\", "/");
 						}
 					}
 			}
