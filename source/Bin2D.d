@@ -121,7 +121,7 @@ in {
 		}
 		buffer[$-2 .. $] = cast(ubyte[])"];";
 
-		buffer ~= "\nconst(ubyte[])*[] assetOriginalNames = [";
+		buffer ~= "\nconst string[] assetOriginalNames = [";
 		foreach(file; filesWithoutScanDir) {
 			buffer ~= "\"" ~ file ~ "\", ";
 		}
