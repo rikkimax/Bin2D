@@ -3,8 +3,9 @@ module Bin2D;
 import std.file : exists, isFile, isDir, dirEntries, SpanMode;
 import std.stdio : writeln, File, SEEK_CUR, write, stdout;
 import std.string : indexOf, lastIndexOf, tr;
-import std.path : baseName;
+import std.path : baseName, dirName;
 import std.math : ceil;
+import std.conv;
 
 static ubyte[4096] buffer;
 
@@ -64,30 +65,39 @@ int main(string[] args) {
 		else if (useUnittest)
 			output.write("version(unittest):\n");
 
-		output.write("""
-import std.file : write, isDir, exists, mkdirRecurse, rmdirRecurse, tempDir;
-import std.path : buildPath;
+		output.write(
+/*BEGIN FILE HEADER*/   
+`
+import std.file : write, isDir, exists, mkdirRecurse, rmdirRecurse, tempDir, mkdir;
+import std.path : buildPath, dirName;
 import std.process : thisProcessID;
 import std.conv : text;
 
-deprecated(\"Use outputFilesToFileSystem instead\")
+deprecated("Use outputFilesToFileSystem instead")
 alias outputBin2D2FS = outputFilesToFileSystem;
 
-deprecated(\"Use names instead\")
+deprecated("Use names instead")
 alias assetNames = names;
 
-deprecated(\"Use values instead\")
+deprecated("Use values instead")
 alias assetValues = values;
 
-deprecated(\"Use originalNames instead\")
+deprecated("Use originalNames instead")
 alias assetOriginalNames = originalNames;
 
+string rootDirectory;
+
+void cleanup(){
+  rmdirRecurse(rootDirectory);
+}
+
 string[string] outputFilesToFileSystem() {
-	return outputBin2D2FS(buildPath(tempDir(), text(thisProcessID())));
+	return outputFilesToFileSystem(buildPath(tempDir(), text(thisProcessID())));
 }
 
 string[string] outputFilesToFileSystem(string dir)
 in {
+  rootDirectory = dir;
 	if (exists(dir)) {
 		if (isDir(dir)) {
 			rmdirRecurse(dir);
@@ -102,18 +112,26 @@ in {
 	string[string] files;
 	foreach(i, name; names) {
 		string realname = originalNames[i];
+    if(! buildPath(dir, realname).dirName().exists())
+    {
+      mkdir(cast(string)buildPath(dir, realname).dirName());
+    }
 		files[cast(string)realname] ~= cast(string)buildPath(dir, realname);
 		write(buildPath(dir, realname), *values[i]);
 	}
 	return files;
-}\n\n""");
+}
+
+`
+/*END FILE HEADER*/
+);
 			
 		string[] files;
 		string[] filesWithoutScanDir;
 		foreach (file; args) {
-			if (file[$-1] == '/' || file[$-1] == '\\')
+			if (file[$-1] == '/' || file[$-1] == '\\') //Clean off paths with slash on end eg. folder\
 				file.length--;
-			file = file.tr("\\", "/");
+			file = file.tr("\\", "/"); //use forward slashes
 		
 			if (exists(file)) {
 				if (isFile(file)) {
@@ -175,9 +193,9 @@ in {
 		foreach(i, file; files) {	
 			// output file contents
 			if (useEnum)
-				output.write("enum ubyte[] ", filenames[i] , " = x\"");
+				output.write("enum ubyte[] "  , " /*"~filenames[i]~"*/ "~ "FILE_"~to!string(i) , " = x\"");
 			else
-				output.write("const(ubyte[]) ", filenames[i] , " = cast(const(ubyte[]))x\"");
+				output.write("const(ubyte[]) ", " /*"~filenames[i]~"*/ "~ "FILE_"~to!string(i) , " = cast(const(ubyte[]))x\"");
 			
 			File readFrom = File(file, "rb");
 			
@@ -241,8 +259,8 @@ in {
 		else
 			output.write("const(string[]) names = [");
 		
-		foreach(name; filenames) {
-			output.write("\"", name, "\", ");
+		foreach(i, name; filenames) {
+			output.write("\"", name , "\", ");
 		}
 		output.seek(-2, SEEK_CUR);
 		output.write("];\n");
@@ -253,7 +271,7 @@ in {
 			output.write("const(string[]) originalNames = [");
 		
 		foreach(name; files) {
-			output.write("\"", name, "\", ");
+			output.write("`", name.tr("/","\\"), "`, ");
 		}
 		output.seek(-2, SEEK_CUR);
 		output.write("];\n");
@@ -263,8 +281,8 @@ in {
 		else
 			output.write("const(ubyte[]*[]) values = [");
 		
-		foreach(name; filenames) {
-			output.write("&", name, ", ");
+		foreach(i, name; filenames) {
+			output.write("&", "FILE_"~to!string(i)~" /*"~name~"*/" , ", ");
 		}
 		output.seek(-2, SEEK_CUR);
 		output.write("];");
