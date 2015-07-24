@@ -15,19 +15,41 @@ A tool that enables files to be compiled into an executable and extracted at sta
 
 ## Basic usage:
 Basic usage is as follows
-Bin2D <output file>[=<module name>] <files or directories...>
+```Bin2D <output file>[=<module name>] <files or directories...>```
 
 **Example**
+I have a tkd project that I want to pack up.
+I need some files and some dll's for it to work.
 
-$ ./Bin2D output.d=awsome.app.resources.output resources/images/logo.png resources/images/pretty.jpg resources/models/animated_logo.obj
-Will create a file called output.d with a model name of awsome.app.resources.output and will have:
+Folder of needed stuff:
+![Folder of needed stuff](images/ProjectFolder1.PNG)
 
-* resources/images/logo.png
-* resources/images/pretty.jpg
-* resources/models/animated_logo.obj
+I added the Bin2d.exe to my path for convience.
 
-Stored in mangled named arrays of that.
+![The process](images/Bin2D_example.gif)
 
+```Bin2D MODULE.d=Resource_Reference library tk86t.dll tcl86t.dll "my tkd app.exe" ```
+
+I created this file and added to my C:\temp folder.
+```D
+import std.stdio;
+import std.process;
+import PKG = Resource_Reference;
+
+void main() {
+    string[string] FILE_LOCATIONS = PKG.outputFilesToFileSystem();
+    
+    foreach(string key; PKG.originalNames){
+          writeln("extracting: ", key , " : " , FILE_LOCATIONS[key] );
+    }
+    execute(FILE_LOCATIONS["my tkd app.exe"]);
+    PKG.cleanup();
+}
+```
+
+I compiled with
+```dmd MAIN.d MODULE.d```
+If you want to do what I did with a gui app you might want to link to windows:subsystem.
 ## But what if I don't know the name at compile time?
 To get access to *all* the values with names you need to iterate over two seperate arrays.
 The first ``names`` will give you the mangled names. The second ``values`` will give you the values based upon the index in assetNames.
