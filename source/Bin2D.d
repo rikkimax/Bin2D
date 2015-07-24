@@ -99,13 +99,11 @@ in {
 		mkdirRecurse(dir);
 	}
 } body {
-	uint i;
 	string[string] files;
 	foreach(i, name; names) {
-		char[] realname = originalNames[i];
+		string realname = originalNames[i];
 		files[cast(string)realname] ~= cast(string)buildPath(dir, realname);
 		write(buildPath(dir, realname), *values[i]);
-		i++;
 	}
 	return files;
 }\n\n""");
@@ -169,41 +167,6 @@ in {
 		writeln("|");
 		stdout.flush;
 		
-		// write names/originalNames/values out
-		
-		if (useEnum)
-			output.write("enum string[] names = [");
-		else
-			output.write("const(string[]) name = [");
-		
-		foreach(name; filenames) {
-			output.write("\"", name, "\", ");
-		}
-		output.seek(-2, SEEK_CUR);
-		output.write("];\n");
-		
-		if (useEnum)
-			output.write("enum string[] originalNames = [");
-		else
-			output.write("const(string[]) originalNames = [");
-		
-		foreach(name; files) {
-			output.write("\"", name, "\", ");
-		}
-		output.seek(-2, SEEK_CUR);
-		output.write("];\n");
-		
-		if (useEnum)
-			output.write("enum ubyte[]*[] values = [");
-		else
-			output.write("const(ubyte[]*[]) values = [");
-		
-		foreach(name; filenames) {
-			output.write("&", name, ", ");
-		}
-		output.seek(-2, SEEK_CUR);
-		output.write("];\n\n");
-		
 		Appender!(char[]) dfout;
 		// giant chunk of memory that should be able to hold exactly one chunk read
 		// is reused, so memory use of program shouldn't be all that high
@@ -214,7 +177,7 @@ in {
 			if (useEnum)
 				output.write("enum ubyte[] ", filenames[i] , " = x\"");
 			else
-				output.write("const(ubyte[]) ", filenames[i] , " = x\"");
+				output.write("const(ubyte[]) ", filenames[i] , " = cast(const(ubyte[]))x\"");
 			
 			File readFrom = File(file, "rb");
 			
@@ -268,6 +231,43 @@ in {
 			write("-");
 		writeln("|");
 		stdout.flush;
+		
+		// write names/originalNames/values out
+		
+		output.write("\n\n");
+		
+		if (useEnum)
+			output.write("enum string[] names = [");
+		else
+			output.write("const(string[]) names = [");
+		
+		foreach(name; filenames) {
+			output.write("\"", name, "\", ");
+		}
+		output.seek(-2, SEEK_CUR);
+		output.write("];\n");
+		
+		if (useEnum)
+			output.write("enum string[] originalNames = [");
+		else
+			output.write("const(string[]) originalNames = [");
+		
+		foreach(name; files) {
+			output.write("\"", name, "\", ");
+		}
+		output.seek(-2, SEEK_CUR);
+		output.write("];\n");
+		
+		if (useEnum)
+			output.write("enum ubyte[]*[] values = [");
+		else
+			output.write("const(ubyte[]*[]) values = [");
+		
+		foreach(name; filenames) {
+			output.write("&", name, ", ");
+		}
+		output.seek(-2, SEEK_CUR);
+		output.write("];");
 		
 		return 0;
 	} else {
