@@ -5,15 +5,14 @@ import std.stdio : writeln, File, SEEK_CUR, write, stdout;
 import std.string : indexOf, lastIndexOf, tr;
 import std.path : baseName, dirName;
 import std.math : ceil;
-import std.conv;
+import std.conv : to;
+import std.getopt : getopt, defaultGetoptPrinter, config;
+import std.format : formattedWrite;
+import std.array : Appender;
 
 static ubyte[4096] buffer;
 
 int main(string[] args) {
-	import std.getopt : getopt, defaultGetoptPrinter, config;
-	import std.format : formattedWrite;
-	import std.array : Appender;
-	
 	string[] originalArgs = args;
 	
 	string outputFile;
@@ -38,7 +37,9 @@ int main(string[] args) {
 		args,
 		"onlyPackage", "Limits the embedded files using package modifier", &usePackage,
 		"onlyUnittest", "Limits the embedded files using version(unittest)", &useUnittest,
-		"useEnum", "Use enum instead of const(ubyte[]) to store the data. Allows for usage at compile time but memory increase for runtime.", &useEnum
+		"useEnum", `Use enum instead of const(ubyte[]) to store the data.
+			Allows for usage at compile time but memory increase for runtime.
+			Will require usage of the enum __ctfeValues instead of values for CTFE access.`, &useEnum
 	);
 	args = args[1 .. $];
 	
@@ -65,8 +66,65 @@ int main(string[] args) {
 		else if (useUnittest)
 			output.write("version(unittest):\n");
 
+		// file name processing
+			
+		string[] files;
+		string[] filesWithoutScanDir;
+		foreach (file; args) {
+			if (file[$-1] == '/' || file[$-1] == '\\') //Clean off paths with slash on end eg. folder\
+				file.length--;
+			file = file.tr("\\", "/"); //use forward slashes
+		
+			if (exists(file)) {
+				if (isFile(file)) {
+					files ~= file;
+					filesWithoutScanDir ~= baseName(file);
+				} else if (isDir(file)) {
+					foreach (entry; dirEntries(file, SpanMode.breadth)) {
+						if (isFile(entry)) {
+							files ~= entry.tr("\\", "/");
+							filesWithoutScanDir ~= entry[file.length + 1 .. $].tr("\\", "/");
+						}
+					}
+				}
+			}
+		}
+		
+		ushort longestFileName;
+		string[] filenames;
+		foreach(file; files){
+			// not ideal in terms of allocation
+			// but atleast it is only the file names,
+			// if we were duplicating or actually storing the file data 
+			// then we might start having problems
+			char[] t = cast(char[])file.dup;
+			// has to be duplicated because of modification would override the values
+			// of course if this was string, it would do something similar
+			// with implicit allocations + dup.
+			
+			if (lastIndexOf(t, "/") > 0)
+				t = t[lastIndexOf(t, "/") + 1 .. $];
+				
+			// sanitises file names
+			foreach(i, c; t) {
+				switch(c) {
+					case 'a': .. case 'z':
+					case 'A': .. case 'Z':
+					case '0': .. case '9':
+					case '_':
+						break;
+					default:
+						t[i] = '_';
+				}
+			}
+			filenames ~= cast(string)t;
+			
+			if (file.length > longestFileName)
+				longestFileName = cast(ushort)file.length;
+		}
+		
 		output.write(
-/*BEGIN FILE HEADER*/   
+/*BEGIN FILE HEADER P1*/   
 `
 import std.file : write, isDir, exists, mkdirRecurse, rmdirRecurse, tempDir, mkdir;
 import std.path : buildPath, dirName;
@@ -109,57 +167,39 @@ in {
 		mkdirRecurse(dir);
 	}
 } body {
+`
+/*END FILE HEADER P1*/);
+	if (useEnum) {
+		output.write(/*BEGIN FILE HEADER P2*/`
+	string[string] files;`);
+	foreach(i, file; files) {
+		output.write("""
+	if (!buildPath(dir, \"", file, "\").dirName().exists())
+		mkdir(cast(string)buildPath(dir, \"", file, "\").dirName());
+	files[\"", file, "\"] ~= cast(string)buildPath(dir, \"", file, "\");
+	write(buildPath(dir, \"", file, "\"), ", filenames[i], ");""");
+	}
+
+	output.write(`
+	return files;
+}
+`
+/*END FILE HEADER p2*/);
+	} else {
+		output.write(/*BEGIN FILE HEADER P2*/`
 	string[string] files;
 	foreach(i, name; names) {
 		string realname = originalNames[i];
-    if(! buildPath(dir, realname).dirName().exists())
-    {
-      mkdir(cast(string)buildPath(dir, realname).dirName());
-    }
+		if (!buildPath(dir, realname).dirName().exists())
+		  mkdir(cast(string)buildPath(dir, realname).dirName());
 		files[cast(string)realname] ~= cast(string)buildPath(dir, realname);
 		write(buildPath(dir, realname), *values[i]);
 	}
 	return files;
 }
-
 `
-/*END FILE HEADER*/
-);
-			
-		string[] files;
-		string[] filesWithoutScanDir;
-		foreach (file; args) {
-			if (file[$-1] == '/' || file[$-1] == '\\') //Clean off paths with slash on end eg. folder\
-				file.length--;
-			file = file.tr("\\", "/"); //use forward slashes
-		
-			if (exists(file)) {
-				if (isFile(file)) {
-					files ~= file;
-					filesWithoutScanDir ~= baseName(file);
-				} else if (isDir(file)) {
-					foreach (entry; dirEntries(file, SpanMode.breadth)) {
-						if (isFile(entry)) {
-							files ~= entry.tr("\\", "/");
-							filesWithoutScanDir ~= entry[file.length + 1 .. $].tr("\\", "/");
-						}
-					}
-				}
-			}
-		}
-		
-		ushort longestFileName;
-		string[] filenames;
-		foreach(file; files){
-			string t = file;
-			if (lastIndexOf(t, "/") > 0)
-				t = t[lastIndexOf(t, "/") + 1.. $];
-			t = t.tr(".", "_").tr("-", "_");
-			filenames ~= t;
-			
-			if (file.length > longestFileName)
-				longestFileName = cast(ushort)file.length;
-		}
+/*END FILE HEADER p2*/);
+	}
 		
 		// write report heading
 		ushort lenNames = cast(ushort)(longestFileName + 2);
@@ -193,23 +233,25 @@ in {
 		foreach(i, file; files) {	
 			// output file contents
 			if (useEnum)
-				output.write("enum ubyte[] "  , " /*"~filenames[i]~"*/ "~ "FILE_"~to!string(i) , " = x\"");
+				output.write("enum ubyte[] ", filenames[i], " = cast(ubyte[])x\"");
 			else
-				output.write("const(ubyte[]) ", " /*"~filenames[i]~"*/ "~ "FILE_"~to!string(i) , " = cast(const(ubyte[]))x\"");
+				output.write("const(ubyte[]) ", filenames[i], " = cast(const(ubyte[]))x\"");
 			
 			File readFrom = File(file, "rb");
-			
+			bool readSome;
 			foreach(bytes; readFrom.byChunk(buffer)) {
 				foreach(b; bytes) {
+					readSome = true;
 					formattedWrite(dfout, "%02x ", b);
 				}
 				
 				output.write(dfout.data());
 				dfout.clear();
 			}
-			
-			output.seek(-1, SEEK_CUR);
+			if (readSome)
+				output.seek(-1, SEEK_CUR);
 			output.write("\";\n");
+			readFrom.close;
 			
 			// output report for file
 			string replac = filenames[i];
@@ -276,16 +318,34 @@ in {
 		output.seek(-2, SEEK_CUR);
 		output.write("];\n");
 		
-		if (useEnum)
-			output.write("enum ubyte[]*[] values = [");
-		else
-			output.write("const(ubyte[]*[]) values = [");
-		
-		foreach(i, name; filenames) {
-			output.write("&", "FILE_"~to!string(i)~" /*"~name~"*/" , ", ");
+		if (useEnum) {
+			output.write("enum ubyte[][] __ctfeValues = [");
+			foreach(i, name; filenames) {
+				output.write(name, ", ");
+			}
+			output.seek(-2, SEEK_CUR);
+			output.write("];\n");
 		}
-		output.seek(-2, SEEK_CUR);
-		output.write("];");
+		
+		if (useEnum) {
+			output.write(`
+const(ubyte[]*[]) values;
+shared static this() {
+	ubyte[]*[] ret;
+	ret.length = __ctfeValues.length;
+	foreach(i, v; __ctfeValues)
+		ret[i] = &v;
+	values = cast(const)ret;
+}`);
+		} else {
+			output.write("const(ubyte[]*[]) values = [");
+			foreach(i, name; filenames) {
+				if (!useEnum)
+					output.write("&", name, ", ");
+			}
+			output.seek(-2, SEEK_CUR);
+			output.write("];");
+		}
 		
 		return 0;
 	} else {
