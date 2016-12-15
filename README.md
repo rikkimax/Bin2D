@@ -11,7 +11,10 @@ A Command line application that produces D module files, which can be compiled i
 - Option for enum for usage at compile time, instead of ``const(ubyte[])``
 - Automatic finding/inclusion of files in folders.
 - Outputs included files at runtime to a specified directory or temporary directory
- 	- __Warning extra files in specified folder will be removed__
+    - __Warning extra files in specified folder will be removed__
+
+## Known limitations
+- Does not allow for filenames used in different directories
 
 ## Basic usage:
 Basic usage is as follows
@@ -72,7 +75,8 @@ outputFilesToFileSystem();
 ```
 It does return the same result as output outputBin2D2FS(string) does.
 
-## Why not string mixins?
+## Why not string imports?
 - String mixins at least on Windows are bugged. They cannot use subdirectories.
-- Assets do not change often so regeneration process can be manual
-- Easy export to file system
+    In newer versions this should be fixed.
+- Assets do not change often so regeneration process can be manual.
+- Easy export to file system.
