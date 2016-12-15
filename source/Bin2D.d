@@ -173,11 +173,11 @@ in {
 		output.write(/*BEGIN FILE HEADER P2*/`
 	string[string] files;`);
 	foreach(i, file; files) {
-		output.write("""
+		output.write("
 	if (!buildPath(dir, \"", file, "\").dirName().exists())
 		mkdir(cast(string)buildPath(dir, \"", file, "\").dirName());
 	files[\"", file, "\"] ~= cast(string)buildPath(dir, \"", file, "\");
-	write(buildPath(dir, \"", file, "\"), ", filenames[i], ");""");
+	write(buildPath(dir, \"", file, "\"), ", filenames[i], ");");
 	}
 
 	output.write(`
@@ -349,13 +349,13 @@ shared static this() {
 		
 		return 0;
 	} else {
-		defaultGetoptPrinter("""
+		defaultGetoptPrinter("
 Usage: Bin2D <output file>[=<module name>] [switches] <files or directories...>
 Bin2D is a resource compiler for the D programming language.
 It compiles resources down to D source code.
 For inclusion into a build. Later accessible given an optional module name.
 
-Switches:"""[1 .. $], procArgs.options);
+Switches:"[1 .. $], procArgs.options);
 
 		return -1;
 	}
